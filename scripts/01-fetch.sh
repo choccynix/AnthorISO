@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # 01-fetch.sh — Download the latest Gentoo stage3 musl+llvm+openrc tarball
 set -euo pipefail
+trap "" PIPE
 
 MIRROR="https://distfiles.gentoo.org/releases/amd64/autobuilds/current-stage3-amd64-musl-llvm-openrc"
 WORK_DIR="${WORK_DIR:-/build/anthoros}"
@@ -9,10 +10,9 @@ FETCH_DIR="${WORK_DIR}/fetch"
 mkdir -p "${FETCH_DIR}"
 
 echo "[01-fetch] Fetching latest stage3 file list..."
-LATEST_FILE=$(curl -fsSL "${MIRROR}/latest-stage3-amd64-musl-llvm-openrc.txt" \
-  | grep -v '^#' \
-  | awk 'NF {print $1}' \
-  | head -n1)
+FILELIST="${FETCH_DIR}/latest-stage3.txt"
+curl -fsSL -o "${FILELIST}" "${MIRROR}/latest-stage3-amd64-musl-llvm-openrc.txt"
+LATEST_FILE=$(grep -v '^#' "${FILELIST}" | awk 'NF {print $1}' | head -n1)
 
 if [[ -z "${LATEST_FILE}" ]]; then
   echo "[01-fetch] ERROR: Could not determine latest stage3 filename."

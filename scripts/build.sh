@@ -3,6 +3,7 @@
 # Usage: ./build.sh [step]
 #   step: fetch | unpack | rebrand | packages | iso | all (default: all)
 set -euo pipefail
+trap "" PIPE
 
 export WORK_DIR="${WORK_DIR:-/build/anthoros}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -19,11 +20,16 @@ run_step() {
 }
 
 cleanup_mounts() {
-  echo "[build] Cleaning up mounts..."
   local rootfs="${WORK_DIR}/rootfs"
-  for mount in proc sys dev run; do
-    mountpoint -q "${rootfs}/${mount}" && umount -R "${rootfs}/${mount}" 2>/dev/null || true
+  [[ ! -d "${rootfs}" ]] && return 0
+  local did_umount=false
+  for mnt in proc sys dev run; do
+    if mountpoint -q "${rootfs}/${mnt}" 2>/dev/null; then
+      did_umount=true
+      umount -R "${rootfs}/${mnt}" 2>/dev/null || true
+    fi
   done
+  ${did_umount} && echo "[build] Mounts cleaned up."
 }
 
 trap cleanup_mounts EXIT
