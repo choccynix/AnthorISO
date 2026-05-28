@@ -48,7 +48,7 @@ jobs:
         run: |
           mkdir -p /tmp/portage-cache /tmp/anthoros-output
 
-          docker run --rm --privileged \
+          docker run --rm --privileged --network host \
             -v "$(pwd)":/anthoros \
             -v /tmp/portage-cache:/var/db/repos/gentoo \
             -v /tmp/anthoros-output:/build/anthoros/output \

@@ -11,7 +11,7 @@ mkdir -p "${FETCH_DIR}"
 
 echo "[01-fetch] Fetching latest stage3 file list..."
 FILELIST="${FETCH_DIR}/latest-stage3.txt"
-curl -fsSL -o "${FILELIST}" "${MIRROR}/latest-stage3-amd64-musl-llvm-openrc.txt"
+curl -fsSL --connect-timeout 30 --max-time 60 -o "${FILELIST}" "${MIRROR}/latest-stage3-amd64-musl-llvm-openrc.txt"
 LATEST_FILE=$(grep -v '^#' "${FILELIST}" | awk 'NF {print $1}' | head -n1)
 
 if [[ -z "${LATEST_FILE}" ]]; then
@@ -25,10 +25,10 @@ DIGEST_URL="${TARBALL_URL}.sha256"
 
 echo "[01-fetch] Latest stage3: ${TARBALL_NAME}"
 echo "[01-fetch] Downloading tarball..."
-curl -fsSL --progress-bar -o "${FETCH_DIR}/${TARBALL_NAME}" "${TARBALL_URL}"
+curl -fsSL --connect-timeout 30 --max-time 1800 --progress-bar -o "${FETCH_DIR}/${TARBALL_NAME}" "${TARBALL_URL}"
 
 echo "[01-fetch] Downloading checksum..."
-curl -fsSL -o "${FETCH_DIR}/${TARBALL_NAME}.sha256" "${DIGEST_URL}"
+curl -fsSL --connect-timeout 30 --max-time 60 -o "${FETCH_DIR}/${TARBALL_NAME}.sha256" "${DIGEST_URL}"
 
 echo "[01-fetch] Verifying checksum..."
 pushd "${FETCH_DIR}" > /dev/null
