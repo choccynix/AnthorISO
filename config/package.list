@@ -1,9 +1,8 @@
 # AnthorOS package list
 # One package per line, comments with #
 
-# Kernel
-sys-kernel/gentoo-kernel-bin
-sys-kernel/linux-firmware
+# Kernel — installed by 04-packages.sh in correct order (dracut first)
+# sys-kernel/gentoo-kernel-bin and sys-kernel/linux-firmware are handled there
 
 # Bootloader
 sys-boot/grub
