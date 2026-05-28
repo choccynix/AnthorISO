@@ -1,0 +1,11 @@
+NAME="AnthorOS"
+VERSION="0.1.0"
+ID=anthoros
+ID_LIKE=gentoo
+PRETTY_NAME="AnthorOS 0.1.0 (musl/llvm/openrc)"
+VERSION_ID="0.1.0"
+HOME_URL="https://github.com/your-org/anthoros"
+SUPPORT_URL="https://github.com/your-org/anthoros/issues"
+BUG_REPORT_URL="https://github.com/your-org/anthoros/issues"
+BUILD_ID="rolling"
+ANSI_COLOR="1;35"

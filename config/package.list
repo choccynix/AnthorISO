@@ -1,0 +1,51 @@
+# AnthorOS package list
+# One package per line, comments with #
+
+# Kernel
+sys-kernel/gentoo-kernel-bin
+sys-kernel/linux-firmware
+
+# Bootloader
+sys-boot/grub
+
+# Base system
+sys-apps/openrc
+sys-apps/busybox
+sys-apps/util-linux
+sys-apps/coreutils
+sys-apps/findutils
+sys-apps/grep
+sys-apps/sed
+sys-apps/gawk
+sys-apps/shadow
+sys-apps/procps
+sys-apps/psmisc
+
+# Filesystem tools
+sys-fs/e2fsprogs
+sys-fs/dosfstools
+sys-fs/squashfs-tools
+
+# Shell
+app-shells/bash
+
+# Editors
+app-editors/vim
+app-editors/nano
+
+# Networking
+net-misc/curl
+net-misc/wget
+net-misc/openssh
+net-tools/net-tools
+sys-apps/iproute2
+
+# Compression
+app-arch/tar
+app-arch/gzip
+app-arch/bzip2
+app-arch/xz-utils
+
+# Misc utilities
+app-misc/screen
+sys-process/htop
