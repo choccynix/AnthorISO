@@ -25,75 +25,75 @@ jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
-      contents: write   # Needed to create releases
-
-    container:
-      image: gentoo/stage3:musl-llvm
-      options: --privileged   # Required for chroot bind mounts
-
-    env:
-      WORK_DIR: /build/anthoros
-      BUILD_STEP: ${{ github.event.inputs.step || 'all' }}
+      contents: write
 
     steps:
-      # ── Checkout ─────────────────────────────────────────────────────────────
+      # ── Checkout on the Ubuntu runner (Node 20 works fine here) ──────────────
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Make scripts executable
-        run: chmod +x scripts/*.sh
+      # ── Portage snapshot cache (on the Ubuntu runner's filesystem) ───────────
+      - name: Get week number
+        id: date
+        run: echo "week=$(date +%Y-W%V)" >> "$GITHUB_OUTPUT"
 
-      # ── Portage snapshot cache ────────────────────────────────────────────────
       - name: Restore Portage snapshot cache
         id: portage-cache
         uses: actions/cache@v4
         with:
-          path: /var/db/repos/gentoo
-          key: portage-snapshot-${{ runner.os }}-${{ hashFiles('config/package.list') }}-${{ steps.date.outputs.week }}
+          path: /tmp/portage-cache
+          key: portage-snapshot-${{ steps.date.outputs.week }}-${{ hashFiles('config/package.list') }}
           restore-keys: |
-            portage-snapshot-${{ runner.os }}-${{ hashFiles('config/package.list') }}-
-            portage-snapshot-${{ runner.os }}-
+            portage-snapshot-${{ steps.date.outputs.week }}-
+            portage-snapshot-
 
-      - name: Get week number (for cache key)
-        id: date
-        run: echo "week=$(date +%Y-W%V)" >> "$GITHUB_OUTPUT"
-
-      - name: Sync Portage (if cache miss or stale)
-        if: steps.portage-cache.outputs.cache-hit != 'true'
-        run: emerge-webrsync -q
-
-      # ── Host tools ────────────────────────────────────────────────────────────
-      - name: Install host build dependencies
+      # ── Run the entire build inside the Gentoo musl container ───────────────
+      - name: Build AnthorOS
         run: |
-          emerge --nospinner -q \
-            sys-fs/squashfs-tools \
-            dev-libs/libisoburn \
-            sys-boot/grub
+          mkdir -p /tmp/portage-cache /tmp/anthoros-output
 
-      # ── Build steps ───────────────────────────────────────────────────────────
-      - name: Fetch stage3
-        run: ./scripts/build.sh fetch
+          docker run --rm --privileged \
+            -v "$(pwd)":/anthoros \
+            -v /tmp/portage-cache:/var/db/repos/gentoo \
+            -v /tmp/anthoros-output:/build/anthoros/output \
+            -e WORK_DIR=/build/anthoros \
+            -e PORTAGE_CACHE_HIT=${{ steps.portage-cache.outputs.cache-hit }} \
+            gentoo/stage3:musl-llvm \
+            bash -c '
+              set -euo pipefail
 
-      - name: Unpack stage3
-        run: ./scripts/build.sh unpack
+              # Install host build tools
+              if [[ "${PORTAGE_CACHE_HIT}" != "true" ]]; then
+                echo ">>> Syncing Portage (cache miss)..."
+                emerge-webrsync -q
+              else
+                echo ">>> Portage cache hit, skipping sync."
+              fi
 
-      - name: Rebrand
-        run: ./scripts/build.sh rebrand
+              emerge --nospinner -q \
+                sys-fs/squashfs-tools \
+                dev-libs/libisoburn \
+                sys-boot/grub
 
-      - name: Install packages
-        run: ./scripts/build.sh packages
+              chmod +x /anthoros/scripts/*.sh
 
-      - name: Build ISO and tarball
-        run: ./scripts/build.sh iso
+              # Run build steps
+              cd /anthoros
+              WORK_DIR=/build/anthoros ./scripts/build.sh fetch
+              WORK_DIR=/build/anthoros ./scripts/build.sh unpack
+              WORK_DIR=/build/anthoros ./scripts/build.sh rebrand
+              WORK_DIR=/build/anthoros ./scripts/build.sh packages
+              WORK_DIR=/build/anthoros ./scripts/build.sh iso
+            '
 
-      # ── Artifacts (always uploaded for every build) ───────────────────────────
+      # ── Upload artifacts (every build) ───────────────────────────────────────
       - name: Upload ISO artifact
         uses: actions/upload-artifact@v4
         with:
           name: anthoros-iso-${{ github.run_number }}
           path: |
-            /build/anthoros/output/*.iso
-            /build/anthoros/output/*.iso.sha256
+            /tmp/anthoros-output/*.iso
+            /tmp/anthoros-output/*.iso.sha256
           retention-days: 14
 
       - name: Upload tarball artifact
@@ -101,13 +101,11 @@ jobs:
         with:
           name: anthoros-stage3-${{ github.run_number }}
           path: |
-            /build/anthoros/output/*.tar.xz
-            /build/anthoros/output/*.tar.xz.sha256
+            /tmp/anthoros-output/*.tar.xz
+            /tmp/anthoros-output/*.tar.xz.sha256
           retention-days: 14
 
       # ── GitHub Release ────────────────────────────────────────────────────────
-      # Publishes on: weekly schedule, manual trigger with publish_release=true,
-      # or a version tag push (v*)
       - name: Set release flag
         id: should-release
         run: |
@@ -168,7 +166,7 @@ jobs:
 
           Built by GitHub Actions · Run \`${{ github.run_number }}\`" \
             --latest \
-            /build/anthoros/output/*.iso \
-            /build/anthoros/output/*.iso.sha256 \
-            /build/anthoros/output/*.tar.xz \
-            /build/anthoros/output/*.tar.xz.sha256
+            /tmp/anthoros-output/*.iso \
+            /tmp/anthoros-output/*.iso.sha256 \
+            /tmp/anthoros-output/*.tar.xz \
+            /tmp/anthoros-output/*.tar.xz.sha256
