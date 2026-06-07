@@ -38,6 +38,13 @@ jobs:
           mkdir -p /etc/portage/package.accept_keywords
           echo "dev-util/catalyst ~amd64" > /etc/portage/package.accept_keywords/catalyst
 
+          # USE flags required by catalyst and its deps
+          mkdir -p /etc/portage/package.use
+          cat > /etc/portage/package.use/catalyst-host << 'USEEOF'
+sys-apps/util-linux python
+sys-boot/grub grub_platforms_efi-32 grub_platforms_efi-64 grub_platforms_pc
+USEEOF
+
           emerge --nospinner -q \
             dev-util/catalyst \
             dev-vcs/git
