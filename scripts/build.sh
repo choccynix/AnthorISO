@@ -33,7 +33,14 @@ FILELIST="/tmp/latest-stage3.txt"
 curl -fsSL --connect-timeout 30 --max-time 60 -o "${FILELIST}" \
   "${MIRROR}/latest-stage3-amd64-musl-llvm-openrc.txt"
 
-LATEST=$(grep -v '^#' "${FILELIST}" | awk 'NF {print $1}' | head -n1)
+# Read without pipelines — pipefail + SIGPIPE from head kills the script under GHA
+LATEST=''
+while IFS= read -r line; do
+  [[ "${line}" =~ ^# ]] && continue
+  [[ -z "${line}" ]] && continue
+  LATEST="${line%% *}"
+  break
+done < "${FILELIST}"
 TARBALL_NAME=$(basename "${LATEST}")
 TARBALL_URL="${MIRROR}/${TARBALL_NAME}"
 
@@ -59,10 +66,25 @@ STAGE3_DEST="${BUILDS_DIR}/stage3-amd64-musl-llvm-openrc-${VERSION}.tar.xz"
 # ── Step 2: Portage snapshot ───────────────────────────────────────────────────
 log "Creating Portage snapshot"
 catalyst -s stable
-TREEISH=$(catalyst -s stable 2>&1 | grep -oP '(?<=snapshot )\w+' | head -n1)
+# Run catalyst snapshot, capture output without pipelines
+CATALYST_OUT=$(catalyst -s stable 2>&1)
+TREEISH=''
+while IFS= read -r line; do
+  if [[ "${line}" == *'snapshot '* ]]; then
+    TREEISH="${line##*snapshot }"
+    TREEISH="${TREEISH%% *}"
+    break
+  fi
+done <<< "${CATALYST_OUT}"
 # Fallback: find the most recent snapshot squashfs
 if [[ -z "${TREEISH}" ]]; then
-  TREEISH=$(ls -t "${CATALYST_DIR}/snapshots/"*.sqfs 2>/dev/null | head -n1 | xargs basename | sed 's/gentoo-//;s/\.sqfs//')
+  for f in "${CATALYST_DIR}/snapshots/"*.sqfs; do
+    [[ -f "${f}" ]] || continue
+    base=$(basename "${f}")
+    TREEISH="${base#gentoo-}"
+    TREEISH="${TREEISH%.sqfs}"
+    break
+  done
 fi
 echo "Portage snapshot: ${TREEISH}"
 
