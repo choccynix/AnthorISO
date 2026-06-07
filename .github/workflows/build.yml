@@ -27,12 +27,16 @@ jobs:
       VERSION: ${{ github.run_number }}-${{ github.sha }}
 
     steps:
-      # ── Checkout on a glibc-compatible step isn't possible in this container,
-      #    so we use git directly after installing it ───────────────────────────
       - name: Install dependencies
         run: |
-          # Sync portage first
+          # repos.conf points here but the dir doesn't exist yet in the container
+          mkdir -p /var/db/repos/gentoo
+
           emerge-webrsync -q
+
+          # Catalyst is ~amd64 only — accept it explicitly
+          mkdir -p /etc/portage/package.accept_keywords
+          echo "dev-util/catalyst ~amd64" > /etc/portage/package.accept_keywords/catalyst
 
           emerge --nospinner -q \
             dev-util/catalyst \
@@ -44,9 +48,6 @@ jobs:
           cd /anthoros
           git checkout "${{ github.sha }}" 2>/dev/null || true
 
-      # ── Portage snapshot cache ────────────────────────────────────────────────
-      # Cache the Portage repo so catalyst -s stable is fast on repeat runs.
-      # Cached to /var/db/repos/gentoo which emerge-webrsync already populated.
       - name: Cache Portage tree
         uses: actions/cache@v4
         with:
@@ -102,7 +103,6 @@ jobs:
           TAG="rolling-${VERSION}"
           BUILD_DATE=$(date +%Y-%m-%d)
 
-          # Clean up existing tag if present
           gh release delete "${TAG}" --repo "${{ github.repository }}" --yes 2>/dev/null || true
           git -C /anthoros push origin ":refs/tags/${TAG}" 2>/dev/null || true
 
