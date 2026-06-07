@@ -40,10 +40,8 @@ jobs:
 
           # USE flags required by catalyst and its deps
           mkdir -p /etc/portage/package.use
-          cat > /etc/portage/package.use/catalyst-host << 'USEEOF'
-sys-apps/util-linux python
-sys-boot/grub grub_platforms_efi-32 grub_platforms_efi-64 grub_platforms_pc
-USEEOF
+          echo "sys-apps/util-linux python" > /etc/portage/package.use/catalyst-host
+          echo "sys-boot/grub grub_platforms_efi-32 grub_platforms_efi-64 grub_platforms_pc" >> /etc/portage/package.use/catalyst-host
 
           emerge --nospinner -q \
             dev-util/catalyst \
