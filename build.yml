@@ -21,7 +21,7 @@ jobs:
 
     container:
       image: gentoo/stage3:musl-llvm
-      options: --privileged --network host
+      options: --privileged
 
     env:
       VERSION: ${{ github.run_number }}-${{ github.sha }}
