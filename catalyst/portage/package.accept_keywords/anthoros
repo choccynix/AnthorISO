@@ -1,0 +1,3 @@
+# Accept ~amd64 for packages that need it on musl
+sys-apps/dracut ~amd64
+app-misc/livecd-tools ~amd64
