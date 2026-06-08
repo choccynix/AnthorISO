@@ -119,4 +119,3 @@ popd > /dev/null
 echo ""
 echo "Build complete. Outputs:"
 ls -lh "${OUTPUT_DIR}/"
-
