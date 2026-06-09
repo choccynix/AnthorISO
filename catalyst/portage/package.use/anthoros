@@ -3,7 +3,6 @@
 # installkernel: use dracut for initramfs, grub for bootloader config
 # disable UKI paths — they pull in glibc/systemd which won't work on musl
 sys-kernel/installkernel grub dracut -ugrd -ukify -generic-uki
-sys-kernel/gentoo-kernel -generic-uki
 sys-kernel/gentoo-kernel-bin -generic-uki
 
 # dracut without systemd for musl+openrc compatibility
