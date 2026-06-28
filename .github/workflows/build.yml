@@ -2,7 +2,7 @@ name: Build AnthorOS
 
 on:
   schedule:
-    - cron: '0 3 * * 0'   # Every Sunday at 03:00 UTC
+    - cron: '0 3 * * 0'
   push:
     branches: [main]
   workflow_dispatch:
@@ -16,7 +16,6 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 360
     permissions:
       contents: write
 
@@ -28,22 +27,15 @@ jobs:
       image: gentoo/stage3:musl-llvm
       options: --privileged
 
-    env:
-      VERSION: ${{ github.run_number }}-${{ github.sha }}
-
     steps:
       - name: Install dependencies
         run: |
-          # repos.conf points here but the dir doesn't exist yet in the container
           mkdir -p /var/db/repos/gentoo
-
           emerge-webrsync -q
 
-          # Catalyst is ~amd64 only — accept it explicitly
           mkdir -p /etc/portage/package.accept_keywords
           echo "dev-util/catalyst ~amd64" > /etc/portage/package.accept_keywords/catalyst
 
-          # USE flags required by catalyst and its deps
           mkdir -p /etc/portage/package.use
           echo "sys-apps/util-linux python" > /etc/portage/package.use/catalyst-host
           echo "sys-boot/grub grub_platforms_efi-32 grub_platforms_efi-64 grub_platforms_pc" >> /etc/portage/package.use/catalyst-host
@@ -52,10 +44,22 @@ jobs:
             dev-util/catalyst \
             dev-vcs/git
 
+      - name: Patch Catalyst to use gentoo-kernel-bin
+        run: |
+          KMERGE=$(find /usr/share/catalyst /usr/lib/catalyst -name kmerge.sh 2>/dev/null | head -n1)
+          if [[ -z "${KMERGE}" ]]; then
+            echo "ERROR: kmerge.sh not found, searching everywhere..."
+            find / -name kmerge.sh 2>/dev/null || true
+            exit 1
+          fi
+          echo "Patching ${KMERGE}"
+          sed -i 's|sys-kernel/gentoo-kernel"|sys-kernel/gentoo-kernel-bin"|' "${KMERGE}"
+          echo "Verified:"
+          grep "ksource" "${KMERGE}"
+
       - name: Checkout repository
         run: |
           git clone --depth=1 https://github.com/choccynix/AnthorISO.git /anthoros
-
 
       - name: Set VERSION
         run: echo "VERSION=$(date +%Y%m%d)" >> $GITHUB_ENV
@@ -66,16 +70,12 @@ jobs:
           cd /anthoros
           VERSION="${VERSION}" ./scripts/build.sh
 
-
-
-      # ── GitHub Release ─────────────────────────────────────────────────────────
       - name: Set release flag
         id: should-release
         run: |
           RELEASE=false
           if [[ "${{ github.event_name }}" == "schedule" ]]; then RELEASE=true; fi
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" && \
-                "${{ github.event.inputs.publish_release }}" == "true" ]]; then RELEASE=true; fi
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ github.event.inputs.publish_release }}" == "true" ]]; then RELEASE=true; fi
           if [[ "${{ github.ref }}" == refs/tags/v* ]]; then RELEASE=true; fi
           echo "release=${RELEASE}" >> "$GITHUB_OUTPUT"
 
@@ -103,12 +103,6 @@ jobs:
           | \`anthoros-amd64-*.iso\` | Bootable ISO (BIOS + UEFI) |
           | \`anthoros-stage3-amd64-*.tar.xz\` | Rootfs tarball |
           | \`*.sha256\` | SHA-256 checksums |
-
-          ### Verify
-          \`\`\`bash
-          sha256sum -c anthoros-amd64-${BUILD_DATE}.iso.sha256
-          sha256sum -c anthoros-stage3-amd64-${BUILD_DATE}.tar.xz.sha256
-          \`\`\`
 
           Built by GitHub Actions · Run \`${{ github.run_number }}\`" \
             --latest \

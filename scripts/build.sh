@@ -1,24 +1,25 @@
 #!/usr/bin/env bash
 # build.sh — AnthorOS build orchestrator (Catalyst-based)
 set -euo pipefail
-trap "" PIPE
 
-REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CATALYST_DIR="/var/tmp/catalyst"
 BUILDS_DIR="${CATALYST_DIR}/builds/anthoros"
 OUTPUT_DIR="${REPO_DIR}/output"
 SPECS_DIR="${REPO_DIR}/catalyst/specs"
-
-# FIXED: Define a directory to hold our generated portage configurations
-PORTAGE_CONFDIR="/tmp/portage-conf"
+CATALYST_CONF="${REPO_DIR}/catalyst/catalyst.conf"
 
 VERSION="${VERSION:-$(date +%Y%m%d)}"
 MIRROR="https://distfiles.gentoo.org/releases/amd64/autobuilds/current-stage3-amd64-musl-llvm-openrc"
 
 mkdir -p "${BUILDS_DIR}" "${OUTPUT_DIR}"
 
-# ── Helpers ────────────────────────────────────────────────────────────────────
-log() { echo ""; echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; echo "  $*"; echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; }
+log() {
+  echo ""
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  echo "  $*"
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+}
 
 fill_spec() {
   local src="$1" dst="$2"
@@ -27,115 +28,83 @@ fill_spec() {
     -e "s|@TREEISH@|${TREEISH}|g" \
     -e "s|@REPO_DIR@|${REPO_DIR}|g" \
     "${src}" > "${dst}"
-    
-  # FIXED: Automatically append the portage_confdir directive to the spec file
-  # so Catalyst knows to look for our accepted licenses!
-  echo "portage_confdir: ${PORTAGE_CONFDIR}" >> "${dst}"
 }
 
-# ── Pre-Step: Generate Portage Configs ─────────────────────────────────────────
-# FIXED: Create the structure to accept linux-firmware (and other binary) licenses
-log "Generating Portage configurations"
-mkdir -p "${PORTAGE_CONFDIR}/package.license"
-# The @BINARY-REDISTRIBUTABLE group covers linux-firmware and other common blobs
-echo "*/* @BINARY-REDISTRIBUTABLE" > "${PORTAGE_CONFDIR}/package.license/anthoros-firmware"
-
-
-# ── Step 1: Fetch stage3 seed ──────────────────────────────────────────────────
+# ── Step 1: Fetch stage3 seed ─────────────────────────────────────────────────
 log "Fetching stage3 seed"
 
 FILELIST="/tmp/latest-stage3.txt"
-curl -fsSL --connect-timeout 30 --max-time 60 -o "${FILELIST}" \
+curl -fsSL --connect-timeout 30 --max-time 60 \
+  -o "${FILELIST}" \
   "${MIRROR}/latest-stage3-amd64-musl-llvm-openrc.txt"
 
-# Parse file list — skip comments, PGP headers, blank lines, keep first .tar.xz path
 LATEST=''
 while IFS= read -r line; do
-  # Skip blank lines, comments, and PGP signature lines
   [[ -z "${line}" ]] && continue
   [[ "${line}" == '#'* ]] && continue
   [[ "${line}" == '-----'* ]] && continue
   [[ "${line}" == 'Hash:'* ]] && continue
-  # Only accept lines pointing to a .tar.xz file
   [[ "${line}" != *'.tar.xz'* ]] && continue
   LATEST="${line%% *}"
   break
 done < "${FILELIST}"
+
+if [[ -z "${LATEST}" ]]; then
+  echo "ERROR: Could not parse stage3 filename"
+  cat "${FILELIST}"
+  exit 1
+fi
+
 TARBALL_NAME=$(basename "${LATEST}")
 TARBALL_URL="${MIRROR}/${TARBALL_NAME}"
+STAGE3_DEST="${BUILDS_DIR}/stage3-amd64-musl-llvm-openrc-${VERSION}.tar.xz"
 
-if [[ ! -f "${BUILDS_DIR}/${TARBALL_NAME}" ]]; then
+if [[ ! -f "${STAGE3_DEST}" ]]; then
   echo "Downloading ${TARBALL_NAME}..."
   curl -fsSL --connect-timeout 30 --max-time 1800 --progress-bar \
-    -o "${BUILDS_DIR}/${TARBALL_NAME}" "${TARBALL_URL}"
+    -o "${STAGE3_DEST}" "${TARBALL_URL}"
 else
   echo "Stage3 already present, skipping download."
 fi
 
-# Rename to the path catalyst expects: rel_type/stage3-...-VERSION
-STAGE3_DEST="${BUILDS_DIR}/stage3-amd64-musl-llvm-openrc-${VERSION}.tar.xz"
-[[ -f "${STAGE3_DEST}" ]] || cp "${BUILDS_DIR}/${TARBALL_NAME}" "${STAGE3_DEST}"
-
-# ── Step 2: Portage snapshot ───────────────────────────────────────────────────
+# ── Step 2: Portage snapshot ──────────────────────────────────────────────────
 log "Creating Portage snapshot"
-
-# Remove leftover repo from previous failed runs to prevent Git Error 128
-rm -rf /var/tmp/catalyst/repos/gentoo.git
-
-# Temporarily disable 'set -e' so we can cleanly capture output
-set +e
-CATALYST_OUT=$(catalyst -s stable 2>&1)
-CAT_EXIT=$?
-set -e
-
-echo "${CATALYST_OUT}"
-
-if [ $CAT_EXIT -ne 0 ]; then
-  echo "Catalyst snapshot failed!"
-  exit $CAT_EXIT
-fi
+catalyst --config "${CATALYST_CONF}" -s stable
 
 TREEISH=''
-while IFS= read -r line; do
-  if [[ "${line}" == *'snapshot '* ]]; then
-    TREEISH="${line##*snapshot }"
-    TREEISH="${TREEISH%% *}"
-    break
-  fi
-done <<< "${CATALYST_OUT}"
+for f in "${CATALYST_DIR}/snapshots/"*.sqfs; do
+  [[ -f "${f}" ]] || continue
+  base=$(basename "${f}")
+  TREEISH="${base#gentoo-}"
+  TREEISH="${TREEISH%.sqfs}"
+  break
+done
 
-# Fallback: find the most recent snapshot squashfs
 if [[ -z "${TREEISH}" ]]; then
-  for f in "${CATALYST_DIR}/snapshots/"*.sqfs; do
-    [[ -f "${f}" ]] || continue
-    base=$(basename "${f}")
-    TREEISH="${base#gentoo-}"
-    TREEISH="${TREEISH%.sqfs}"
-    break
-  done
+  echo "ERROR: Could not find Portage snapshot"
+  exit 1
 fi
 echo "Portage snapshot: ${TREEISH}"
 
-# ── Step 3: livecd-stage1 ─────────────────────────────────────────────────────
+# ── Step 3: livecd-stage1 ────────────────────────────────────────────────────
 log "Running livecd-stage1"
 fill_spec "${SPECS_DIR}/livecd-stage1.spec" "/tmp/anthoros-stage1.spec"
-catalyst -f /tmp/anthoros-stage1.spec
+catalyst --config "${CATALYST_CONF}" -f /tmp/anthoros-stage1.spec
 
-# ── Step 4: livecd-stage2 (kernel + ISO) ──────────────────────────────────────
+# ── Step 4: livecd-stage2 ────────────────────────────────────────────────────
 log "Running livecd-stage2 (kernel + ISO)"
 fill_spec "${SPECS_DIR}/livecd-stage2.spec" "/tmp/anthoros-stage2.spec"
-catalyst -f /tmp/anthoros-stage2.spec
+catalyst --config "${CATALYST_CONF}" -f /tmp/anthoros-stage2.spec
 
-# ── Step 5: Collect outputs ────────────────────────────────────────────────────
+# ── Step 5: Collect outputs ───────────────────────────────────────────────────
 log "Collecting outputs"
 
 ISO_SRC="${CATALYST_DIR}/builds/anthoros/anthoros-amd64-${VERSION}.iso"
-TARBALL_SRC="${BUILDS_DIR}/stage3-amd64-musl-llvm-openrc-${VERSION}.tar.xz"
 ISO_OUT="${OUTPUT_DIR}/anthoros-amd64-${VERSION}.iso"
 TARBALL_OUT="${OUTPUT_DIR}/anthoros-stage3-amd64-${VERSION}.tar.xz"
 
 cp "${ISO_SRC}" "${ISO_OUT}"
-cp "${TARBALL_SRC}" "${TARBALL_OUT}"
+cp "${STAGE3_DEST}" "${TARBALL_OUT}"
 
 pushd "${OUTPUT_DIR}" > /dev/null
 sha256sum "$(basename "${ISO_OUT}")"     > "$(basename "${ISO_OUT}").sha256"
