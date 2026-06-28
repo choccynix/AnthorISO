@@ -2,7 +2,7 @@
 # build.sh — AnthorOS build orchestrator (Catalyst-based)
 set -euo pipefail
 
-REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CATALYST_DIR="/var/tmp/catalyst"
 BUILDS_DIR="${CATALYST_DIR}/builds/anthoros"
 OUTPUT_DIR="${REPO_DIR}/output"
