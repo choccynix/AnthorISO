@@ -46,13 +46,17 @@ jobs:
 
       - name: Patch Catalyst to use gentoo-kernel-bin
         run: |
-          KMERGE=$(find /usr/share/catalyst /usr/lib/catalyst -name kmerge.sh 2>/dev/null | head -n1)
+          echo "Searching for kmerge.sh..."
+          KMERGE=""
+          while IFS= read -r -d "" f; do
+            KMERGE="${f}"
+            break
+          done < <(find / -name kmerge.sh -print0 2>/dev/null)
           if [[ -z "${KMERGE}" ]]; then
-            echo "ERROR: kmerge.sh not found, searching everywhere..."
-            find / -name kmerge.sh 2>/dev/null || true
+            echo "ERROR: kmerge.sh not found anywhere"
             exit 1
           fi
-          echo "Patching ${KMERGE}"
+          echo "Found: ${KMERGE}"
           sed -i 's|sys-kernel/gentoo-kernel"|sys-kernel/gentoo-kernel-bin"|' "${KMERGE}"
           echo "Verified:"
           grep "ksource" "${KMERGE}"
