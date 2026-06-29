@@ -16,14 +16,13 @@ livecd/type: gentoo-release-minimal
 livecd/volid: AnthorOS amd64 @VERSION@
 livecd/depclean: yes
 
-# Distribution kernel + dracut — avoids glibc initramfs issues on musl
 boot/kernel: anthoros
 boot/kernel/anthoros/distkernel: yes
-boot/kernel/anthoros/sources: gentoo-kernel
+boot/kernel/anthoros/sources: gentoo-kernel-bin
 boot/kernel/anthoros/packages:
 	sys-boot/grub
+	sys-apps/dracut
 
-# dracut modules: dmsquash-live is required for the squashfs live environment
 boot/kernel/anthoros/dracut_args: --xz --no-hostonly -a dmsquash-live -o btrfs -o crypt -o i18n
 
 livecd/rm:

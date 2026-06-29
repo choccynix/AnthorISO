@@ -1,3 +1,4 @@
-# Accept ~amd64 for packages that need it on musl
+# Packages that need ~amd64 on musl
+dev-util/catalyst ~amd64
 sys-apps/dracut ~amd64
 app-misc/livecd-tools ~amd64

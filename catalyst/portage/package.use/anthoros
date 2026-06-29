@@ -1,12 +1,14 @@
 # AnthorOS ISO build — package USE flags
 
-# installkernel: use dracut for initramfs, grub for bootloader config
-# disable UKI paths — they pull in glibc/systemd which won't work on musl
+# installkernel: dracut for initramfs, grub for bootloader — no UKI/systemd paths
 sys-kernel/installkernel grub dracut -ugrd -ukify -generic-uki
 sys-kernel/gentoo-kernel-bin -generic-uki
 
-# dracut without systemd for musl+openrc compatibility
+# dracut without systemd — required for musl+openrc
 sys-apps/dracut -systemd
 
-# grub: build both BIOS and EFI targets
+# grub: BIOS + UEFI 64-bit
 sys-boot/grub grub_platforms_efi-64 grub_platforms_pc
+
+# util-linux: python bindings required by catalyst
+sys-apps/util-linux python

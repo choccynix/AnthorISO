@@ -14,18 +14,16 @@ livecd/use:
 	livecd
 
 livecd/packages:
-	# Base
 	app-editors/nano
 	app-editors/vim
 	app-misc/screen
 	app-shells/bash
-	# Filesystem tools
+	app-misc/livecd-tools
 	sys-fs/e2fsprogs
 	sys-fs/dosfstools
 	sys-fs/btrfs-progs
 	sys-fs/xfsprogs
 	sys-block/parted
-	# Networking
 	net-misc/openssh
 	net-misc/dhcpcd
 	net-misc/curl
@@ -33,11 +31,8 @@ livecd/packages:
 	sys-apps/iproute2
 	net-wireless/wpa_supplicant
 	net-wireless/iw
-	# System utils
 	sys-apps/pciutils
 	sys-apps/usbutils
 	sys-apps/gptfdisk
 	sys-process/htop
-	app-misc/livecd-tools
-	# Kernel firmware
 	sys-kernel/linux-firmware

@@ -8,7 +8,6 @@ BUILDS_DIR="${CATALYST_DIR}/builds/anthoros"
 OUTPUT_DIR="${REPO_DIR}/output"
 SPECS_DIR="${REPO_DIR}/catalyst/specs"
 CATALYST_CONF="${REPO_DIR}/catalyst/catalyst.conf"
-
 VERSION="${VERSION:-$(date +%Y%m%d)}"
 MIRROR="https://distfiles.gentoo.org/releases/amd64/autobuilds/current-stage3-amd64-musl-llvm-openrc"
 
@@ -38,10 +37,11 @@ curl -fsSL --connect-timeout 30 --max-time 60 \
   -o "${FILELIST}" \
   "${MIRROR}/latest-stage3-amd64-musl-llvm-openrc.txt"
 
+# Parse without pipelines to avoid SIGPIPE under GHA pipefail
 LATEST=''
 while IFS= read -r line; do
-  [[ -z "${line}" ]] && continue
-  [[ "${line}" == '#'* ]] && continue
+  [[ -z "${line}" ]]          && continue
+  [[ "${line}" == '#'*  ]]    && continue
   [[ "${line}" == '-----'* ]] && continue
   [[ "${line}" == 'Hash:'* ]] && continue
   [[ "${line}" != *'.tar.xz'* ]] && continue
@@ -50,27 +50,27 @@ while IFS= read -r line; do
 done < "${FILELIST}"
 
 if [[ -z "${LATEST}" ]]; then
-  echo "ERROR: Could not parse stage3 filename"
+  echo "ERROR: Could not parse stage3 filename from file list:"
   cat "${FILELIST}"
   exit 1
 fi
 
 TARBALL_NAME=$(basename "${LATEST}")
-TARBALL_URL="${MIRROR}/${TARBALL_NAME}"
 STAGE3_DEST="${BUILDS_DIR}/stage3-amd64-musl-llvm-openrc-${VERSION}.tar.xz"
 
 if [[ ! -f "${STAGE3_DEST}" ]]; then
   echo "Downloading ${TARBALL_NAME}..."
   curl -fsSL --connect-timeout 30 --max-time 1800 --progress-bar \
-    -o "${STAGE3_DEST}" "${TARBALL_URL}"
+    -o "${STAGE3_DEST}" "${MIRROR}/${TARBALL_NAME}"
 else
   echo "Stage3 already present, skipping download."
 fi
 
 # ── Step 2: Portage snapshot ──────────────────────────────────────────────────
 log "Creating Portage snapshot"
-catalyst --config "${CATALYST_CONF}" -s stable
+catalyst --configs "${CATALYST_CONF}" -s stable
 
+# Find snapshot treeish without pipelines
 TREEISH=''
 for f in "${CATALYST_DIR}/snapshots/"*.sqfs; do
   [[ -f "${f}" ]] || continue
@@ -81,7 +81,8 @@ for f in "${CATALYST_DIR}/snapshots/"*.sqfs; do
 done
 
 if [[ -z "${TREEISH}" ]]; then
-  echo "ERROR: Could not find Portage snapshot"
+  echo "ERROR: Could not find Portage snapshot in ${CATALYST_DIR}/snapshots/"
+  ls -la "${CATALYST_DIR}/snapshots/" || true
   exit 1
 fi
 echo "Portage snapshot: ${TREEISH}"
@@ -89,12 +90,12 @@ echo "Portage snapshot: ${TREEISH}"
 # ── Step 3: livecd-stage1 ────────────────────────────────────────────────────
 log "Running livecd-stage1"
 fill_spec "${SPECS_DIR}/livecd-stage1.spec" "/tmp/anthoros-stage1.spec"
-catalyst --config "${CATALYST_CONF}" -f /tmp/anthoros-stage1.spec
+catalyst --configs "${CATALYST_CONF}" -f /tmp/anthoros-stage1.spec
 
 # ── Step 4: livecd-stage2 ────────────────────────────────────────────────────
 log "Running livecd-stage2 (kernel + ISO)"
 fill_spec "${SPECS_DIR}/livecd-stage2.spec" "/tmp/anthoros-stage2.spec"
-catalyst --config "${CATALYST_CONF}" -f /tmp/anthoros-stage2.spec
+catalyst --configs "${CATALYST_CONF}" -f /tmp/anthoros-stage2.spec
 
 # ── Step 5: Collect outputs ───────────────────────────────────────────────────
 log "Collecting outputs"
