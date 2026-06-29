@@ -4,11 +4,10 @@ sys-boot/grub grub_platforms_efi-32 grub_platforms_efi-64 grub_platforms_pc
 # util-linux: python bindings required by catalyst
 sys-apps/util-linux python
 
-# installkernel: use dracut for initramfs, no UKI/systemd paths
-# systemd-boot is installed to the rootfs for use when installing to disk
-# grub is only used by catalyst to make the ISO itself bootable
-sys-kernel/installkernel systemd-boot dracut -ugrd -ukify -generic-uki
+# installkernel: grub bootloader + dracut initramfs, no UKI/systemd
+# Note: systemd-boot requires systemd USE which is incompatible with musl+openrc
+sys-kernel/installkernel grub dracut -ugrd -ukify -generic-uki
 sys-kernel/gentoo-kernel-bin -generic-uki
 
-# dracut without systemd — required for musl+openrc
-sys-apps/dracut -systemd
+# dracut: correct category is sys-kernel, without systemd for musl+openrc
+sys-kernel/dracut -systemd

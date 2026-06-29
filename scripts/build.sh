@@ -29,27 +29,20 @@ fill_spec() {
     "${src}" > "${dst}"
 }
 
-# ── Pre-flight: verify USE flags are satisfied before starting ────────────────
+# ── Pre-flight: check USE flags before wasting build time ─────────────────────
 log "Pre-flight USE flag check"
 
-# Run emerge pretend and fail fast if any USE changes are needed
-# --autounmask=n makes emerge exit non-zero instead of suggesting changes
-PREFLIGHT_PASS=true
 if ! emerge --pretend --nospinner --autounmask=n \
     dev-util/catalyst \
     sys-boot/grub \
     sys-apps/util-linux \
-    sys-apps/dracut \
+    sys-kernel/dracut \
     sys-kernel/gentoo-kernel-bin \
     sys-kernel/installkernel 2>&1; then
   echo ""
-  echo "ERROR: USE flag pre-flight failed. Check the output above."
-  echo "Required USE flags are set in: ${REPO_DIR}/catalyst/portage/package.use/anthoros"
-  echo "Host USE flags are set in: /etc/portage/package.use/catalyst-host"
-  PREFLIGHT_PASS=false
-fi
-
-if [[ "${PREFLIGHT_PASS}" == "false" ]]; then
+  echo "ERROR: USE flag pre-flight failed."
+  echo "Fix flags in: ${REPO_DIR}/catalyst/portage/package.use/anthoros"
+  echo "Fix host flags in: /etc/portage/package.use/catalyst-host"
   exit 1
 fi
 echo "Pre-flight passed."
