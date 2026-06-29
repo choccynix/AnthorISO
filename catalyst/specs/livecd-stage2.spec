@@ -16,12 +16,15 @@ livecd/type: gentoo-release-minimal
 livecd/volid: AnthorOS amd64 @VERSION@
 livecd/depclean: yes
 
+# Catalyst uses GRUB internally to make the ISO bootable (BIOS+UEFI)
+# systemd-boot is installed into the rootfs for use when installing to disk
 boot/kernel: anthoros
 boot/kernel/anthoros/distkernel: yes
 boot/kernel/anthoros/sources: gentoo-kernel-bin
 boot/kernel/anthoros/packages:
 	sys-boot/grub
 	sys-apps/dracut
+	sys-boot/systemd-boot
 
 boot/kernel/anthoros/dracut_args: --xz --no-hostonly -a dmsquash-live -o btrfs -o crypt -o i18n
 

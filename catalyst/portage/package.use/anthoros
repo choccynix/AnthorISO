@@ -1,14 +1,14 @@
-# AnthorOS ISO build — package USE flags
+# Required by dev-util/catalyst[iso] — non-negotiable
+sys-boot/grub grub_platforms_efi-32 grub_platforms_efi-64 grub_platforms_pc
 
-# installkernel: dracut for initramfs, grub for bootloader — no UKI/systemd paths
-sys-kernel/installkernel grub dracut -ugrd -ukify -generic-uki
+# util-linux: python bindings required by catalyst
+sys-apps/util-linux python
+
+# installkernel: use dracut for initramfs, no UKI/systemd paths
+# systemd-boot is installed to the rootfs for use when installing to disk
+# grub is only used by catalyst to make the ISO itself bootable
+sys-kernel/installkernel systemd-boot dracut -ugrd -ukify -generic-uki
 sys-kernel/gentoo-kernel-bin -generic-uki
 
 # dracut without systemd — required for musl+openrc
 sys-apps/dracut -systemd
-
-# grub: BIOS + UEFI 64-bit
-sys-boot/grub grub_platforms_efi-64 grub_platforms_pc
-
-# util-linux: python bindings required by catalyst
-sys-apps/util-linux python

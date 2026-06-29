@@ -29,6 +29,31 @@ fill_spec() {
     "${src}" > "${dst}"
 }
 
+# ── Pre-flight: verify USE flags are satisfied before starting ────────────────
+log "Pre-flight USE flag check"
+
+# Run emerge pretend and fail fast if any USE changes are needed
+# --autounmask=n makes emerge exit non-zero instead of suggesting changes
+PREFLIGHT_PASS=true
+if ! emerge --pretend --nospinner --autounmask=n \
+    dev-util/catalyst \
+    sys-boot/grub \
+    sys-apps/util-linux \
+    sys-apps/dracut \
+    sys-kernel/gentoo-kernel-bin \
+    sys-kernel/installkernel 2>&1; then
+  echo ""
+  echo "ERROR: USE flag pre-flight failed. Check the output above."
+  echo "Required USE flags are set in: ${REPO_DIR}/catalyst/portage/package.use/anthoros"
+  echo "Host USE flags are set in: /etc/portage/package.use/catalyst-host"
+  PREFLIGHT_PASS=false
+fi
+
+if [[ "${PREFLIGHT_PASS}" == "false" ]]; then
+  exit 1
+fi
+echo "Pre-flight passed."
+
 # ── Step 1: Fetch stage3 seed ─────────────────────────────────────────────────
 log "Fetching stage3 seed"
 
@@ -37,20 +62,19 @@ curl -fsSL --connect-timeout 30 --max-time 60 \
   -o "${FILELIST}" \
   "${MIRROR}/latest-stage3-amd64-musl-llvm-openrc.txt"
 
-# Parse without pipelines to avoid SIGPIPE under GHA pipefail
 LATEST=''
 while IFS= read -r line; do
-  [[ -z "${line}" ]]          && continue
-  [[ "${line}" == '#'*  ]]    && continue
-  [[ "${line}" == '-----'* ]] && continue
-  [[ "${line}" == 'Hash:'* ]] && continue
+  [[ -z "${line}" ]]             && continue
+  [[ "${line}" == '#'*  ]]       && continue
+  [[ "${line}" == '-----'* ]]    && continue
+  [[ "${line}" == 'Hash:'* ]]    && continue
   [[ "${line}" != *'.tar.xz'* ]] && continue
   LATEST="${line%% *}"
   break
 done < "${FILELIST}"
 
 if [[ -z "${LATEST}" ]]; then
-  echo "ERROR: Could not parse stage3 filename from file list:"
+  echo "ERROR: Could not parse stage3 filename from:"
   cat "${FILELIST}"
   exit 1
 fi
@@ -70,7 +94,6 @@ fi
 log "Creating Portage snapshot"
 catalyst --configs "${CATALYST_CONF}" -s stable
 
-# Find snapshot treeish without pipelines
 TREEISH=''
 for f in "${CATALYST_DIR}/snapshots/"*.sqfs; do
   [[ -f "${f}" ]] || continue
@@ -81,11 +104,11 @@ for f in "${CATALYST_DIR}/snapshots/"*.sqfs; do
 done
 
 if [[ -z "${TREEISH}" ]]; then
-  echo "ERROR: Could not find Portage snapshot in ${CATALYST_DIR}/snapshots/"
+  echo "ERROR: No snapshot found in ${CATALYST_DIR}/snapshots/"
   ls -la "${CATALYST_DIR}/snapshots/" || true
   exit 1
 fi
-echo "Portage snapshot: ${TREEISH}"
+echo "Snapshot: ${TREEISH}"
 
 # ── Step 3: livecd-stage1 ────────────────────────────────────────────────────
 log "Running livecd-stage1"

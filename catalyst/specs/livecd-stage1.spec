@@ -17,8 +17,8 @@ livecd/packages:
 	app-editors/nano
 	app-editors/vim
 	app-misc/screen
-	app-shells/bash
 	app-misc/livecd-tools
+	app-shells/bash
 	sys-fs/e2fsprogs
 	sys-fs/dosfstools
 	sys-fs/btrfs-progs

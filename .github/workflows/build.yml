@@ -36,9 +36,12 @@ jobs:
           mkdir -p /etc/portage/package.accept_keywords
           echo "dev-util/catalyst ~amd64" > /etc/portage/package.accept_keywords/catalyst
 
+          # Host USE flags — efi-32 is required by catalyst[iso], not optional
           mkdir -p /etc/portage/package.use
-          echo "sys-apps/util-linux python" > /etc/portage/package.use/catalyst-host
-          echo "sys-boot/grub grub_platforms_efi-64 grub_platforms_pc" >> /etc/portage/package.use/catalyst-host
+          {
+            echo "sys-apps/util-linux python"
+            echo "sys-boot/grub grub_platforms_efi-32 grub_platforms_efi-64 grub_platforms_pc"
+          } > /etc/portage/package.use/catalyst-host
 
           emerge --nospinner -q \
             dev-util/catalyst \
@@ -46,8 +49,6 @@ jobs:
 
       - name: Patch Catalyst kmerge.sh to use gentoo-kernel-bin
         run: |
-          # Catalyst 4.x hardcodes gentoo-kernel in kmerge.sh regardless of spec
-          # We patch it directly to use the binary kernel instead
           KMERGE=""
           while IFS= read -r -d "" f; do
             KMERGE="${f}"
@@ -57,10 +58,10 @@ jobs:
             echo "ERROR: kmerge.sh not found"
             exit 1
           fi
-          echo "Patching ${KMERGE}"
+          echo "Patching: ${KMERGE}"
           sed -i 's|sys-kernel/gentoo-kernel"|sys-kernel/gentoo-kernel-bin"|g' "${KMERGE}"
-          echo "Patch result:"
-          grep -i "ksource\|gentoo-kernel" "${KMERGE}" || true
+          echo "Verified:"
+          grep -i "gentoo-kernel" "${KMERGE}" || true
 
       - name: Checkout repository
         run: git clone --depth=1 https://github.com/choccynix/AnthorISO.git /anthoros
